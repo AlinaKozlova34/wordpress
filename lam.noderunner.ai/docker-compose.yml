@@ -1,0 +1,95 @@
+version: '3.9'
+
+services:
+  LAMdb:
+    image: mysql:8.0
+    container_name: LAM_db
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - MYSQL_DATABASE=LAMwordpress
+    volumes:
+      - ./db:/var/lib/mysql2
+    command: '--default-authentication-plugin=mysql_native_password'
+    networks:
+      default:
+        ipv4_address: 10.1.12.14
+
+
+  LAMphpmyadmin:
+    container_name: LAM_phpmyadmin
+    depends_on:
+      - LAMdb
+    image: phpmyadmin
+    env_file: .env
+    restart: always
+    ports:
+      - '127.0.0.1:8084:80'
+    environment:
+      - PMA_HOST=LAMwordpress
+      - MYSQL_ROOT_PASSWORD=$MYSQL_ROOT_PASSWORD
+    networks:
+      default:
+        ipv4_address: 10.1.12.15
+   
+   
+
+  LAMwordpress:
+    depends_on:
+      - LAMdb
+    image: wordpress:6.0.2-php8.0-fpm
+    # command: 'chown 1000:1000 ./html:/var/www/html'
+    container_name: LAM_wordpress
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - WORDPRESS_DB_HOST=LAMdb:3306
+      - WORDPRESS_DB_USER=$MYSQL_USER
+      - WORDPRESS_DB_PASSWORD=$MYSQL_PASSWORD
+      - WORDPRESS_DB_NAME=LAMwordpress
+    volumes:
+      - ./uploads.ini:/usr/local/etc/php/conf.d/uploads.ini
+      - ./html:/var/www/html
+    networks:
+      default:
+        ipv4_address: 10.1.12.16
+
+
+
+
+
+  LAMwebserver:
+    depends_on:
+      - LAMwordpress
+    image: nginx:1.15.12-alpine
+    container_name: LAM_webserver
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:7443:443"
+    volumes:
+      - ./html:/var/www/html
+      - ./nginx-conf:/etc/nginx/conf.d
+      - ./nginx-conf/snippets/self-signed.conf:/etc/nginx/snippets/self-signed.conf
+      - ./nginx-conf/snippets/ssl-params.conf:/etc/nginx/snippets/ssl-params.conf
+      - ./nginx-conf/certs:/etc/nginx/certs
+      - ./nginx-conf/private:/etc/nginx/private
+      # - /etc/nginx/private:/etc/nginx/private
+      - ./nginx-conf/dhparam.pem:/etc/nginx/dhparam.pem
+    networks:
+      default:
+        ipv4_address: 10.1.12.17
+     
+
+  
+
+volumes:
+  LAMwordpress:
+  LAMdb:
+
+
+
+
+networks:
+  default:
+    external: true
+    name: routed0
